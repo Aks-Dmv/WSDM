@@ -3,6 +3,7 @@ import random
 import copy
 from collections import namedtuple, deque
 from replay_buffer import ReplayBuffer
+from readTree import *
 
 import tensorflow as tf
 from keras import backend as K
@@ -10,27 +11,26 @@ from keras.layers import Dense, Input, Add, Activation, LeakyReLU, Dropout
 from keras.layers import GaussianNoise, Concatenate, BatchNormalization
 from keras.models import Model
 from keras.optimizers import Adam
-import copy
-from rep import Memory
+
 
 NUM_DIM=2
 NUM_ACTIONS = NUM_DIM+2
-TREE_DEPTH=9
-BUFFER_SIZE = int(2*1e3)  # replay buffer size
-BATCH_SIZE = 64        # minibatch size
+TREE_DEPTH=8
+BUFFER_SIZE = int(1e4)  # replay buffer size
+BATCH_SIZE = 512        # minibatch size
 GAMMA = 0.9            # discount factor
-TAU = 5*1e-2              # for soft update of target parameters
-LR_ACTOR = 2*1e-3         # learning rate of the actor
-LR_CRITIC = 2*1e-2        # learning rate of the critic
+TAU = 1e-3              # for soft update of target parameters
+LR_ACTOR = 1e-4         # learning rate of the actor
+LR_CRITIC = 1e-3        # learning rate of the critic
 
-EPSILON_DECAY = 20000
+EPSILON_DECAY = 1000
 FINAL_EPSILON = 0.1
-INITIAL_EPSILON = 0.3
+INITIAL_EPSILON = 1.0
 
 # Fully Connected Layer's size was set to
 # 2*NUM_ACTIONS
-FC_ACTOR = 64*NUM_ACTIONS
-FC_CRITIC = 64*NUM_ACTIONS
+FC_ACTOR = 8*NUM_ACTIONS
+FC_CRITIC = 8*NUM_ACTIONS
 
 
 class Agent:
@@ -45,6 +45,7 @@ class Agent:
             action_size (int): dimension of each action
             random_seed (int): random seed
         """
+        self.expert=readTree()
         self.env = env
         self.sess = sess
         self.state_size = state_size
@@ -52,7 +53,7 @@ class Agent:
         self.seed = random.seed(random_seed)
         self.epsilon=INITIAL_EPSILON
 
-        self.sigmaParam = 0.5
+        self.sigmaParam = 0.3
 
 
 
@@ -83,7 +84,7 @@ class Agent:
         self.critic_state_input,self.critic_action_input=self.critic_local.input
         self.critic_grads = tf.gradients(self.critic_local.output, self.critic_action_input)
         # Replay memory
-        self.memory = Memory(action_size, BUFFER_SIZE, BATCH_SIZE, random_seed)
+        self.memory = ReplayBuffer(action_size, BUFFER_SIZE, BATCH_SIZE, random_seed)
 
         # Initialize for later gradient calculations
         self.sess.run(tf.global_variables_initializer())
@@ -103,23 +104,8 @@ class Agent:
             experiences (Tuple[torch.Tensor]): tuple of (s, a, r, s', done) tuples
             gamma (float): discount factor
         """
-        batch=copy.deepcopy(experiences)
 
-        errors = self._getTargets( batch )
-        for i in range(len(batch)):
-            idx = batch[i][0]
-            self.memory.update(idx, errors[i])
-
-
-        # for o in experiences:
-        #     print("youas",o[1][0])
-        # states = np.array([ o[1][0] for o in batch ])
-        states = np.vstack([e[1][0] for e in experiences if e is not None])
-        actions = np.vstack([e[1][1] for e in experiences if e is not None])
-        rewards = np.vstack([e[1][2] for e in experiences if e is not None])
-        next_states = np.vstack([e[1][3] for e in experiences if e is not None])
-        dones = np.vstack([e[1][4] for e in experiences if e is not None])
-        # states, actions, rewards, next_states, dones = experiences[:][1]
+        states, actions, rewards, next_states, dones = experiences
 
         # ---------------------------- update critic ---------------------------- #
         # Get predicted next-state actions and Q values from target models
@@ -199,7 +185,7 @@ class Agent:
         h1 = Activation('relu')(h1)
         h1 = Dropout(0.5)(h1)
 
-        finalOutput = Dense(1)(h1)
+        finalOutput = Dense(action_size)(h1)
         finalOutput = BatchNormalization()(finalOutput)
         finalOutput = LeakyReLU(alpha=0.1)(finalOutput)
         return Model([S,A],finalOutput)
@@ -270,66 +256,18 @@ class Agent:
         self.critic_target.save(path+'critic_target_'+extension)
         #print("Successfully saved network.")
 
-
-    def _getTargets(self, batch):
-
-        # batch=batch[1]
-        no_state = np.zeros(2*NUM_DIM)
-        #print("length of batch",batch)
-        # print("length of batch",batch)
-        #
-
-        states = np.array([ o[1][0] for o in batch ])
-        states_ = np.array([ (no_state if o[1][3] is None else o[1][3]) for o in batch ])
-
-
-        #print(states)
-        action1 = self.actor_local.predict(states)
-        # print(action1)
-        # print("the real sa ", [states, action1],len([states, action1]))
-        p = self.critic_local.predict([states, action1])
-
-        act1 = self.actor_local.predict(states_)
-        p_ = self.critic_local.predict([states_, act1])
-
-        act2 = self.actor_target.predict(states_)
-        pTarget_ = self.critic_target.predict([states_, act2])
-
-        errors = np.zeros(len(batch))
-
-        for i in range(len(batch)):
-            o = batch[i][1]
-            s = o[0]; a = o[1]; r = o[2]; s_ = o[3]; d=o[4]
-
-            t = p[i]
-            oldVal = t
-            if s_ is None:
-                t = r
-            else:
-                t = r + GAMMA * pTarget_[i]*(1-d)  # double DQN
-
-            #print(r)
-            #print(oldVal,t,GAMMA * pTarget_[i]*(1-d) )
-            errors[i] = abs(oldVal - t)
-
-        return errors
-
     def step(self, state, action, reward, next_state, done):
         """Save experience in replay memory, and use random sample from buffer to learn."""
         # Save experience / reward
-        sample=(state, action, reward, next_state, done)
-        errors = self._getTargets([[0, sample]])
-        self.memory.add(errors[0], state, action, reward, next_state, done)
+        self.memory.add(state, action, reward, next_state, done)
 
         # Slowly decay the learning rate
         if self.epsilon > FINAL_EPSILON:
             self.epsilon -= (INITIAL_EPSILON-FINAL_EPSILON)/EPSILON_DECAY
-
         # Learn, if enough samples are available in memory
-        # if self.memory.tree.write > BATCH_SIZE:
-        experiences = self.memory.sampleInternal()
-        #print(experiences)
-        self.learn(experiences, GAMMA)
+        if len(self.memory) > BATCH_SIZE:
+            experiences = self.memory.sample()
+            self.learn(experiences, GAMMA)
 
     def softmax(self,x):
         """Compute softmax values for each sets of scores in x."""
@@ -341,24 +279,54 @@ class Agent:
         #print("state ",state)
         #print("self.actor_local.predict(state)[0] ",self.actor_local.predict(state)[0])
         #print("self.actor_local.predict(state) ",self.actor_local.predict(state))
-        action = self.actor_local.predict(state)[0]
+        # action = self.actor_local.predict(state)[0]
+        state = np.reshape(state,(-1,NUM_DIM))
+        DimVal = self.expert.act(state)
+        # just for defining
+        action = np.random.random_sample( self.action_size )
+        action[:-1]=self.softmax(action[:-1])
+        # we will handle action[-1] afterwards
 
-        if add_noise:
-            """
-            If we are adding noise, we clearly know that we are exploring.
-            """
-            orig_weights=np.array( self.actor_local.get_weights() )
-            al=np.random.normal(1., self.sigmaParam*self.epsilon )
-            self.actor_local.set_weights( orig_weights*al )
-            noisyAction = self.actor_local.predict(state)[0]
-            self.actor_local.set_weights( orig_weights )
-            action=noisyAction
-
-            rand_val = np.random.random()
-            if rand_val < self.epsilon:
-                #print("if running")
+        # Expert considers this a leaf node
+        if(len(DimVal)==0):
+            # Until we get the argmax to be stop
+            # we resample
+            while((self.action_size-2)!=np.argmax(action[:-1])):
                 action[:-1] = np.random.random_sample( self.action_size-1 )
                 action[:-1]=self.softmax(action[:-1])
+            # this is an offset for the mu
+            action[-1] = action[-1] + 5
+        else:
+            # Select one action from the set
+            DimVal=random.choice(DimVal)
+
+            # We make sure that the argmax is the same as
+            # the expert defined dim ie. DimVal[0]
+            while(int(DimVal[0])!=np.argmax(action[:-1])):
+                action[:-1] = np.random.random_sample( self.action_size-1 )
+                action[:-1]=self.softmax(action[:-1])
+
+            action[-1] = DimVal[1]
+
+
+
+
+        # if add_noise:
+        #     """
+        #     If we are adding noise, we clearly know that we are exploring.
+        #     """
+        #     orig_weights=np.array( self.actor_local.get_weights() )
+        #     al=np.random.normal(1., self.sigmaParam*self.epsilon )
+        #     self.actor_local.set_weights( orig_weights*al )
+        #     noisyAction = self.actor_local.predict(state)[0]
+        #     self.actor_local.set_weights( orig_weights )
+        #     action=noisyAction
+        #
+        #     rand_val = np.random.random()
+        #     if rand_val < self.epsilon:
+        #         #print("if running")
+        #         action[:-1] = np.random.random_sample( self.action_size-1 )
+        #         action[:-1]=self.softmax(action[:-1])
 
         return action
 

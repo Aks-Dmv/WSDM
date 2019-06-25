@@ -25,7 +25,7 @@ LR_CRITIC = 2*1e-2        # learning rate of the critic
 
 EPSILON_DECAY = 20000
 FINAL_EPSILON = 0.1
-INITIAL_EPSILON = 0.3
+INITIAL_EPSILON = 0.6
 
 # Fully Connected Layer's size was set to
 # 2*NUM_ACTIONS

@@ -16,21 +16,21 @@ from rep import Memory
 NUM_DIM=2
 NUM_ACTIONS = NUM_DIM+2
 TREE_DEPTH=9
-BUFFER_SIZE = int(2*1e3)  # replay buffer size
+BUFFER_SIZE = int(3*1e3)  # replay buffer size
 BATCH_SIZE = 64        # minibatch size
 GAMMA = 0.9            # discount factor
 TAU = 5*1e-2              # for soft update of target parameters
-LR_ACTOR = 2*1e-3         # learning rate of the actor
-LR_CRITIC = 2*1e-2        # learning rate of the critic
+LR_ACTOR = 1e-3         # learning rate of the actor
+LR_CRITIC = 1e-2        # learning rate of the critic
 
-EPSILON_DECAY = 20000
-FINAL_EPSILON = 0.1
-INITIAL_EPSILON = 0.3
+EPSILON_DECAY = 3000
+FINAL_EPSILON = 0.05
+INITIAL_EPSILON = 0.6
 
 # Fully Connected Layer's size was set to
 # 2*NUM_ACTIONS
-FC_ACTOR = 64*NUM_ACTIONS
-FC_CRITIC = 64*NUM_ACTIONS
+FC_ACTOR = 16*NUM_ACTIONS
+FC_CRITIC = 16*NUM_ACTIONS
 
 
 class Agent:
@@ -324,7 +324,6 @@ class Agent:
         # Slowly decay the learning rate
         if self.epsilon > FINAL_EPSILON:
             self.epsilon -= (INITIAL_EPSILON-FINAL_EPSILON)/EPSILON_DECAY
-
         # Learn, if enough samples are available in memory
         # if self.memory.tree.write > BATCH_SIZE:
         experiences = self.memory.sampleInternal()

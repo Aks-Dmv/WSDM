@@ -49,13 +49,13 @@ class BFSWorldEnv:
         # This is the first state to be processed
         self.addState( copy.deepcopy(self._trueBoundaries), 0 )
 
-        self._infoRewardMultiplier=20
+        self._infoRewardMultiplier=40
         self.penalty=-1
         self.OutOfBounds=-5
         # the max value the network's regress var should take
         self._maxRegressVal=2
         # For how many points is considered useless
-        self.thresholdNumber=10
+        self.thresholdNumber=5
 
     def close(self):
         self.reset()
@@ -80,7 +80,7 @@ class BFSWorldEnv:
         """
         e = self.UpcomingState(state, inheritedN)
         if len(self.StateBuffer) < self.max_size:
-            self.StateBuffer.append(e)
+            self.StateBuffer.appendleft(e)
         else:
             print("max Limit reached, Increase Buffer Size")
 
@@ -91,7 +91,7 @@ class BFSWorldEnv:
         """
         e = self.UpcomingState(state, inheritedN)
         if len(self.StateBuffer) < self.max_size:
-            self.StateBuffer.appendleft(e)
+            self.StateBuffer.append(e)
         else:
             print("max Limit reached, Increase Buffer Size")
 
@@ -174,7 +174,7 @@ class BFSWorldEnv:
         plt.xlabel('x')
         plt.ylabel('y')
         plt.show(block=False)
-        #input("enter")
+        input("enter")
         plt.close()
 
 
@@ -213,7 +213,7 @@ class BFSWorldEnv:
 
             """
             #print(len(self.StateActionMemory))
-            reward=20*self.penalty/(len(self.StateActionMemory)+1)
+            reward=50*self.penalty/(len(self.StateActionMemory)+1)
             # reward = self.penalty
 
             #reward=self._Quitpenalty #/(len(self.actionstatepairs)+1)
@@ -324,9 +324,9 @@ class BFSWorldEnv:
         State1[dim][0]=val
         State2[dim][1]=val
         #print("state 1 and 2",State1,"\n",State2)
-        # self.addState( State1, N1 )
-        # self.addState( State2, N2 )
-        reward = self._infoRewardMultiplier*(500*InfoGain+self.penalty)
+        self.addState( State1, N1 )
+        self.addState( State2, N2 )
+        reward = self._infoRewardMultiplier*(1000*InfoGain+self.penalty)
         #print("cut reward",reward)
         #print("infogain",InfoGain)
 
@@ -334,14 +334,22 @@ class BFSWorldEnv:
         np.random.randint(2, size=1)[0] gives either 0 or 1 with equal prob
         """
         if(np.random.randint(2, size=1)[0]==1):
-            self.addState( State1, N1 )
-            self.addState( State2, N2 )
-            # bounds=self.returnState(copy.deepcopy(State2))
+            bounds=self.returnState(copy.deepcopy(State2))
         else:
-            self.addState( State2, N2 )
-            self.addState( State1, N1 )
-            # bounds=self.returnState(copy.deepcopy(State1))
-
-        bounds=self.StateBuffer[-1][0]
-        bounds = self.returnState(copy.deepcopy(bounds) )
+            bounds=self.returnState(copy.deepcopy(State1))
         return bounds, reward,False,None
+
+#
+#     if __name__ == "__main__":
+#
+#         print("yooo")
+#
+# b=BFSWorldEnv()
+# b.addStateAction(b._trueBoundaries,np.array([0.2,0.7,0.1,5]) )
+# b.addStateAction([[-1.,4.],[1.,5.]],np.array([0.7,0.2,0.1,3]) )
+# b.addState([[-1.,4.],[1.,5.]],10 )
+# b.addState([[-1.,4.],[1.,5.]],20 )
+# for i in b.StateBuffer:
+#     print(i)
+# b.render()
+# b.seed(10)
