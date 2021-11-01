@@ -1,7 +1,5 @@
 # WSDM
 
-![alt text](Figure_1.png)
-
 This repository was created in partial fulfillment for the research based course Study Oriented Project (SOP), which I took at BITS. 
 
 This repository contains code that a DDPG agent to first conform to a given clustering strategy using behavioral cloning, and then iteratively adapt to new influxes in data points.
