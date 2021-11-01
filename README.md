@@ -16,4 +16,10 @@ The following Python libraries are required for running the repository:
 4. SKLearn
 5. OpenAI Gym
 
-We have included snapshots of different algorithms and the code can be run by starting up the 'DDPG.ipynb' in any of the folders and running it.
+We have included snapshots of different algorithms and the code can be run by starting up the `DDPG.ipynb` in any of the folders and running it. We suggest using the following commands below:
+
+
+```bash
+$ cd CodeToRun
+$ open DDPG.ipynb 
+```
